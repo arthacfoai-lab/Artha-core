@@ -1,0 +1,24 @@
+{
+  "name": "artha",
+  "version": "0.1.0",
+  "description": "ARTHA — AI-Native Financial Operating System for Indian MSMEs",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=artha-api",
+    "dev:worker": "npm run dev --workspace=artha-worker",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:worker\"",
+    "setup": "bash scripts/setup.sh",
+    "migrate": "bash scripts/migrate.sh",
+    "lint": "eslint . --ext .js",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "nodemon": "^3.1.0"
+  }
+}
