@@ -1,0 +1,18 @@
+{
+  "name": "@artha/database",
+  "version": "0.1.0",
+  "description": "ARTHA PostgreSQL client, repository pattern, migrations, audit foundation",
+  "main": "src/index.js",
+  "private": true,
+  "scripts": {
+    "migrate": "node src/migrations/runner.js up",
+    "migrate:down": "node src/migrations/runner.js down",
+    "migrate:status": "node src/migrations/runner.js status"
+  },
+  "dependencies": {
+    "pg": "^8.12.0",
+    "@artha/config": "*",
+    "@artha/logger": "*",
+    "@artha/errors": "*"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@artha/session",
+  "version": "0.1.0",
+  "description": "ARTHA Redis session abstraction — tenant-namespaced, OpenClaw-compatible",
+  "main": "src/index.js",
+  "private": true,
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "@artha/config": "*",
+    "@artha/logger": "*"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@artha/logger",
+  "version": "0.1.0",
+  "description": "ARTHA structured logger — trace_id + tenant context propagation",
+  "main": "src/index.js",
+  "private": true,
+  "dependencies": {
+    "winston": "^3.13.0",
+    "@artha/config": "*"
+  }
+}
