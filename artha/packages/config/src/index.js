@@ -19,7 +19,11 @@
  *   - All secrets come from environment — never hardcoded
  */
 
-require('dotenv').config();
+const path = require('path');
+
+require('dotenv').config({
+  path: path.resolve(__dirname, '../../../.env'),
+});
 
 const { validateEnv } = require('./env.schema');
 
@@ -30,16 +34,16 @@ const env = validateEnv(process.env);
 const config = Object.freeze({
 
   // ── Runtime ───────────────────────────────────────────────────────────────
-  env:    env.NODE_ENV,
-  isDev:  env.NODE_ENV === 'development',
+  env: env.NODE_ENV,
+  isDev: env.NODE_ENV === 'development',
   isTest: env.NODE_ENV === 'test',
   isProd: env.NODE_ENV === 'production',
 
   // ── App ───────────────────────────────────────────────────────────────────
   app: Object.freeze({
-    name:    env.APP_NAME,
+    name: env.APP_NAME,
     version: env.APP_VERSION,
-    port:    env.PORT,
+    port: env.PORT,
   }),
 
   // ── Database ──────────────────────────────────────────────────────────────
@@ -53,15 +57,15 @@ const config = Object.freeze({
 
   // ── Redis ─────────────────────────────────────────────────────────────────
   redis: Object.freeze({
-    url:        env.REDIS_URL,
+    url: env.REDIS_URL,
     sessionTtl: env.REDIS_SESSION_TTL_SECONDS,
   }),
 
   // ── JWT ───────────────────────────────────────────────────────────────────
   jwt: Object.freeze({
-    secret:            env.JWT_SECRET,
-    expiresIn:         env.JWT_EXPIRES_IN,
-    refreshExpiresIn:  env.JWT_REFRESH_EXPIRES_IN,
+    secret: env.JWT_SECRET,
+    expiresIn: env.JWT_EXPIRES_IN,
+    refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
   }),
 
   // ── Security ──────────────────────────────────────────────────────────────
@@ -69,13 +73,13 @@ const config = Object.freeze({
     webhookSecret: env.WEBHOOK_SECRET,
     rateLimit: Object.freeze({
       windowMs: env.RATE_LIMIT_WINDOW_MS,
-      max:      env.RATE_LIMIT_MAX_REQUESTS,
+      max: env.RATE_LIMIT_MAX_REQUESTS,
     }),
   }),
 
   // ── Logging ───────────────────────────────────────────────────────────────
   logging: Object.freeze({
-    level:  env.LOG_LEVEL,
+    level: env.LOG_LEVEL,
     format: env.LOG_FORMAT,
   }),
 
