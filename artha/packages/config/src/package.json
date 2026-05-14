@@ -1,0 +1,11 @@
+{
+  "name": "@artha/config",
+  "version": "0.1.0",
+  "description": "ARTHA centralized configuration and environment validation",
+  "main": "src/index.js",
+  "private": true,
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "joi": "^17.13.1"
+  }
+}

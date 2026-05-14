@@ -1,0 +1,7 @@
+{
+  "name": "@artha/errors",
+  "version": "0.1.0",
+  "description": "ARTHA typed error taxonomy — fintech-safe error classification",
+  "main": "src/index.js",
+  "private": true
+}
