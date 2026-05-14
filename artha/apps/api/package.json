@@ -1,26 +1,23 @@
 {
-  "name": "artha-api",
+  "name": "@artha/api",
   "version": "0.1.0",
-  "description": "ARTHA Main API Server",
+  "description": "ARTHA API — main HTTP process, engine gateway, middleware chain",
   "main": "src/server.js",
+  "private": true,
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
-    "test": "jest"
+    "dev":   "node --watch src/server.js",
+    "start": "node src/server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "dotenv": "^16.4.5",
-    "joi": "^17.13.1",
-    "pg": "^8.11.3",
-    "bullmq": "^5.1.0",
-    "ioredis": "^5.3.2",
-    "winston": "^3.13.0",
-    "jsonwebtoken": "^9.0.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.0"
+    "express":            "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "helmet":             "^7.1.0",
+    "cors":               "^2.8.5",
+    "jsonwebtoken":       "^9.0.2",
+    "@artha/config":   "*",
+    "@artha/logger":   "*",
+    "@artha/errors":   "*",
+    "@artha/database": "*",
+    "@artha/session":  "*"
   }
 }
