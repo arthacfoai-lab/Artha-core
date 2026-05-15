@@ -1,0 +1,11 @@
+{
+  "name": "@artha/validators",
+  "version": "0.1.0",
+  "description": "ARTHA shared Joi validation schemas — money, GSTIN, pagination, auth",
+  "main": "src/index.js",
+  "private": true,
+  "dependencies": {
+    "joi": "^17.13.1",
+    "@artha/errors": "*"
+  }
+}
