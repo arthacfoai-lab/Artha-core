@@ -2,46 +2,59 @@
 
 const express = require('express');
 
+const authRoutes    = require('./auth.routes');
+const messageRoutes = require('./message.routes');
+
 const router = express.Router();
 
 /**
  * ARTHA API v1 Router
  *
- * Routes wired progressively per implementation day.
- * Stubs return 501 with clear day-label until implemented.
+ * Mounts all versioned routes.
+ * Auth middleware is applied per-sub-router — not globally here.
+ * This allows public routes (auth register/login) alongside protected routes.
  *
- * Day 1:  /health /ready /version (system routes — not here)
- * Day 3:  /auth    — auth.routes.js
- * Day 3:  /accounting — accounting.routes.js
- * Day 4:  /message — message.routes.js (routing engine)
- * Day 5:  /webhooks — webhook.routes.js (OpenClaw)
- * Day 6:  /gst     — gst.routes.js
- * Day 8:  /vendors, /customers — memory routes
- * Day 9:  /reports — report.routes.js
- * Day 10: /reminders — reminder.routes.js (Paperclip)
+ * Wired routes (Day 2):
+ *   /auth    — register, login, refresh, me
+ *   /message — route messages, session management
+ *
+ * Stub routes (future days):
+ *   /accounting — Day 3
+ *   /gst        — Day 6
+ *   /vendors    — Day 8
+ *   /customers  — Day 8
+ *   /reports    — Day 9
+ *   /reminders  — Day 10
+ *   /webhooks   — Day 5 (OpenClaw + Paperclip)
+ *
+ * Stub responses return 501 with implementation day label.
+ * Allows API consumers to discover endpoints early.
+ * Replaced with real routers as days progress.
  */
 
-// ── Day 3: Auth ───────────────────────────────────────────────────────────────
-router.use('/auth', (_req, res) => {
-  res.status(501).json({
-    ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'Auth engine — Day 3' },
-  });
-});
+// ── Day 2: Live routes ─────────────────────────────────────────────────────────
+router.use('/auth',    authRoutes);
+router.use('/message', messageRoutes);
 
-// ── Day 3: Accounting ─────────────────────────────────────────────────────────
+// ── Day 3: Accounting ──────────────────────────────────────────────────────────
 router.use('/accounting', (_req, res) => {
   res.status(501).json({
     ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'Accounting engine — Day 3' },
+    error: {
+      code:    'NOT_IMPLEMENTED',
+      message: 'Accounting engine — Day 3',
+    },
   });
 });
 
-// ── Day 4: Message routing ────────────────────────────────────────────────────
-router.use('/message', (_req, res) => {
+// ── Day 5: Webhooks (OpenClaw + Paperclip) ─────────────────────────────────────
+router.use('/webhooks', (_req, res) => {
   res.status(501).json({
     ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'Routing engine — Day 4' },
+    error: {
+      code:    'NOT_IMPLEMENTED',
+      message: 'Webhook routes — Day 5',
+    },
   });
 });
 
@@ -49,7 +62,10 @@ router.use('/message', (_req, res) => {
 router.use('/gst', (_req, res) => {
   res.status(501).json({
     ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'GST engine — Day 6' },
+    error: {
+      code:    'NOT_IMPLEMENTED',
+      message: 'GST engine — Day 6',
+    },
   });
 });
 
@@ -57,14 +73,20 @@ router.use('/gst', (_req, res) => {
 router.use('/vendors', (_req, res) => {
   res.status(501).json({
     ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'Business memory — Day 8' },
+    error: {
+      code:    'NOT_IMPLEMENTED',
+      message: 'Business memory engine — Day 8',
+    },
   });
 });
 
 router.use('/customers', (_req, res) => {
   res.status(501).json({
     ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'Business memory — Day 8' },
+    error: {
+      code:    'NOT_IMPLEMENTED',
+      message: 'Business memory engine — Day 8',
+    },
   });
 });
 
@@ -72,15 +94,21 @@ router.use('/customers', (_req, res) => {
 router.use('/reports', (_req, res) => {
   res.status(501).json({
     ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'Intelligence engine — Day 9' },
+    error: {
+      code:    'NOT_IMPLEMENTED',
+      message: 'Intelligence engine — Day 9',
+    },
   });
 });
 
-// ── Day 10: Reminders ─────────────────────────────────────────────────────────
+// ── Day 10: Reminders (Paperclip) ─────────────────────────────────────────────
 router.use('/reminders', (_req, res) => {
   res.status(501).json({
     ok:    false,
-    error: { code: 'NOT_IMPLEMENTED', message: 'Paperclip orchestration — Day 10' },
+    error: {
+      code:    'NOT_IMPLEMENTED',
+      message: 'Paperclip orchestration — Day 10',
+    },
   });
 });
 
