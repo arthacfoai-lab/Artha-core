@@ -1,54 +1,52 @@
 'use strict';
 
-const { validate } = require('@artha/validators');
+const { ValidationError } = require('@artha/errors');
 
 /**
  * ARTHA Validation Middleware Factory
  *
- * Creates Express middleware that validates req.body, req.query,
- * or req.params against a Joi schema before reaching the route handler.
+ * Creates Express middleware that validates req.body / req.query / req.params
+ * against a Joi schema before reaching the route handler.
  *
- * On success:
- *   Validated + coerced value stored on req.validatedBody / req.validatedQuery / req.validatedParams
- *   Calls next() — handler proceeds
+ * On success: validated value stored on req.validatedBody / req.validatedQuery / req.validatedParams
+ * On failure: next(ValidationError) — error.middleware returns 400
  *
- * On failure:
- *   Calls next(ValidationError) — error.middleware.js returns 400
- *   Route handler never executes
- *
- * Usage:
- *   const { validateBody, validateQuery } = require('../middleware/validate.middleware');
- *   const { loginSchema } = require('../validators/auth.validator');
- *
- *   router.post('/login',
- *     validateBody(loginSchema),
- *     async (req, res, next) => {
- *       const { email, password, companyId } = req.validatedBody;
- *       // ...
- *     }
- *   );
- *
- * Integration points:
- *   - All route handlers — body, query, param validation
- *   - @artha/validators validate() — core validation function (Day 2)
- *   - error.middleware.js (Day 1) — catches ValidationError from next()
- *
- * Note: This middleware is the Express-layer wrapper around @artha/validators validate().
- * For non-HTTP contexts (workers, schedulers), call validate() directly.
+ * Uses Joi directly — does not require @artha/validators package.
+ * This allows route files to import validators from local validators/ dir.
  */
 
-/**
- * Validate req.body against schema.
- * Stores validated value on req.validatedBody.
- *
- * @param {Joi.Schema} schema
- * @param {object} [options] — Joi options override
- * @returns {Function} Express middleware
- */
+const DEFAULT_OPTIONS = {
+  abortEarly:   false,
+  stripUnknown: true,
+  convert:      true,
+};
+
+function _validate(data, schema, options = {}) {
+  const { error, value } = schema.validate(data, { ...DEFAULT_OPTIONS, ...options });
+
+  if (error) {
+    const message = error.details
+      .map((d) => d.message.replace(/['"]/g, ''))
+      .join('; ');
+
+    const meta = {
+      fields: error.details.map((d) => ({
+        field:   d.path.join('.'),
+        message: d.message.replace(/['"]/g, ''),
+        type:    d.type,
+      })),
+    };
+
+    throw new ValidationError(message, meta);
+  }
+
+  return value;
+}
+
 function validateBody(schema, options = {}) {
   return function bodyValidator(req, _res, next) {
     try {
-      req.validatedBody = validate(req.body || {}, schema, options);
+      req.validatedBody = _validate(req.body || {}, schema, options);
       return next();
     } catch (err) {
       return next(err);
@@ -56,18 +54,10 @@ function validateBody(schema, options = {}) {
   };
 }
 
-/**
- * Validate req.query against schema.
- * Stores validated value on req.validatedQuery.
- *
- * @param {Joi.Schema} schema
- * @param {object} [options]
- * @returns {Function} Express middleware
- */
 function validateQuery(schema, options = {}) {
   return function queryValidator(req, _res, next) {
     try {
-      req.validatedQuery = validate(req.query || {}, schema, options);
+      req.validatedQuery = _validate(req.query || {}, schema, options);
       return next();
     } catch (err) {
       return next(err);
@@ -75,18 +65,10 @@ function validateQuery(schema, options = {}) {
   };
 }
 
-/**
- * Validate req.params against schema.
- * Stores validated value on req.validatedParams.
- *
- * @param {Joi.Schema} schema
- * @param {object} [options]
- * @returns {Function} Express middleware
- */
 function validateParams(schema, options = {}) {
   return function paramsValidator(req, _res, next) {
     try {
-      req.validatedParams = validate(req.params || {}, schema, options);
+      req.validatedParams = _validate(req.params || {}, schema, options);
       return next();
     } catch (err) {
       return next(err);
@@ -94,8 +76,4 @@ function validateParams(schema, options = {}) {
   };
 }
 
-module.exports = {
-  validateBody,
-  validateQuery,
-  validateParams,
-};
+module.exports = { validateBody, validateQuery, validateParams };

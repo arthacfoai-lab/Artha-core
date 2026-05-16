@@ -1,12 +1,11 @@
 'use strict';
 
 const express = require('express');
-
-const { authenticateMiddleware } = require('../../middleware/auth.middleware');
-const { tenantMiddleware }       = require('../../middleware/tenant.middleware');
-const { validateBody }           = require('../../middleware/validate.middleware');
-const { ok, created }            = require('../../helpers/response.helper');
-const authEngine                 = require('../../engines/auth/auth.engine');
+const { authenticateMiddleware }  = require('../../middleware/auth.middleware');
+const { tenantMiddleware }        = require('../../middleware/tenant.middleware');
+const { validateBody }            = require('../../middleware/validate.middleware');
+const { ok, created }             = require('../../helpers/response.helper');
+const authEngine                  = require('../../engines/auth/auth.engine');
 const {
   registerSchema,
   loginSchema,
@@ -19,51 +18,40 @@ const router = express.Router();
  * ARTHA Auth Routes — /api/v1/auth
  *
  * Public routes (no auth required):
- *   POST /api/v1/auth/register  — create company + owner user
- *   POST /api/v1/auth/login     — get token pair
- *   POST /api/v1/auth/refresh   — exchange refresh token for new access token
+ *   POST /register  — create company + owner user + seed chart of accounts
+ *   POST /login     — authenticate, get token pair
+ *   POST /refresh   — exchange refresh token for new access token
  *
  * Protected routes (auth required):
- *   GET  /api/v1/auth/me        — get current user + company profile
+ *   GET  /me        — get current user + company profile
  *
- * Multi-tenant login:
- *   Login requires companyId in request body.
- *   Two companies can have users with the same email address.
- *   companyId scopes the email lookup to the correct tenant.
- *
- * Token flow:
- *   register/login → { accessToken, refreshToken }
- *   accessToken    → Authorization: Bearer <token> on protected routes
- *   refreshToken   → POST /auth/refresh → new accessToken
+ * Day 3 change: register now seeds chart of accounts atomically.
+ * Response includes ledger count to confirm seeding succeeded.
  *
  * Integration points:
- *   - auth.engine.js      — register(), login(), refresh(), getMe()
- *   - auth.validator.js   — request schema validation
- *   - validate.middleware — validateBody() wraps schemas
- *   - response.helper     — ok(), created() response shape
- *   - authenticateMiddleware (Day 1) — protects /me route
- *   - tenantMiddleware (Day 1)       — sets req.tenantContext on /me
- *   - auditRepository (Day 1)        — auth events logged by auth.engine
+ *   - auth.engine.js       — register, login, refresh, getMe
+ *   - auth.validator.js    — request schema validation
+ *   - validate.middleware   — validateBody() wrapper
+ *   - response.helper      — ok(), created() response shape
+ *   - authenticateMiddleware — protects /me
+ *   - tenantMiddleware       — sets req.tenantContext on /me
  */
 
 /**
  * POST /api/v1/auth/register
  *
- * Create a new company and owner user.
- * Returns token pair — user is authenticated immediately on registration.
+ * Create company + owner user + seed 30 default ledger accounts.
+ * All three in a single atomic transaction.
+ * Returns token pair — user authenticated immediately on registration.
  *
  * Body: { companyName, ownerName, email, password, gstin?, pan?, businessType?, companyPhone? }
- * Response: { company, user, tokens }
  */
 router.post(
   '/register',
   validateBody(registerSchema),
   async (req, res, next) => {
     try {
-      const result = await authEngine.register(
-        req.validatedBody,
-        req.traceId
-      );
+      const result = await authEngine.register(req.validatedBody, req.traceId);
 
       req.log && req.log.info('auth_register_response', {
         company_id: result.company.id,
@@ -75,7 +63,6 @@ router.post(
         user:    result.user,
         tokens:  result.tokens,
       });
-
     } catch (err) {
       return next(err);
     }
@@ -86,10 +73,9 @@ router.post(
  * POST /api/v1/auth/login
  *
  * Authenticate with email + password within a company tenant.
- * companyId required — scopes email lookup to correct tenant.
+ * companyId required — prevents cross-tenant email collisions.
  *
  * Body: { email, password, companyId }
- * Response: { user, tokens }
  */
 router.post(
   '/login',
@@ -115,7 +101,6 @@ router.post(
         user:   result.user,
         tokens: result.tokens,
       });
-
     } catch (err) {
       return next(err);
     }
@@ -126,22 +111,16 @@ router.post(
  * POST /api/v1/auth/refresh
  *
  * Exchange a valid refresh token for a new access token.
- * Refresh token is NOT rotated — client reuses until expiry.
  *
  * Body: { refreshToken }
- * Response: { accessToken, expiresIn, tokenType }
  */
 router.post(
   '/refresh',
   validateBody(refreshSchema),
   async (req, res, next) => {
     try {
-      const { refreshToken } = req.validatedBody;
-
-      const result = authEngine.refresh(refreshToken, req.traceId);
-
+      const result = authEngine.refresh(req.validatedBody.refreshToken, req.traceId);
       return ok(res, req, result);
-
     } catch (err) {
       return next(err);
     }
@@ -151,10 +130,8 @@ router.post(
 /**
  * GET /api/v1/auth/me
  *
- * Get current authenticated user profile and company.
- * Requires valid Bearer token.
- *
- * Response: { user, company }
+ * Get current authenticated user + company.
+ * Requires valid Bearer access token.
  */
 router.get(
   '/me',
@@ -167,12 +144,7 @@ router.get(
         req.tenantContext.userId,
         req.traceId
       );
-
-      return ok(res, req, {
-        user:    result.user,
-        company: result.company,
-      });
-
+      return ok(res, req, { user: result.user, company: result.company });
     } catch (err) {
       return next(err);
     }
