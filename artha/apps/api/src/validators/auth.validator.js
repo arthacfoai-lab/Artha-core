@@ -1,6 +1,6 @@
 'use strict';
 
-const { Joi } = require('@artha/validators');
+const Joi = require('joi');
 
 /**
  * Auth request validators.
@@ -9,26 +9,11 @@ const { Joi } = require('@artha/validators');
  * All schemas strip unknown fields (stripUnknown: true in validate()).
  *
  * Schemas:
- *   register — POST /api/v1/auth/register
- *   login    — POST /api/v1/auth/login
- *   refresh  — POST /api/v1/auth/refresh
+ *   registerSchema — POST /api/v1/auth/register
+ *   loginSchema    — POST /api/v1/auth/login
+ *   refreshSchema  — POST /api/v1/auth/refresh
  */
 
-/**
- * Registration schema.
- *
- * Required:
- *   companyName — business name
- *   ownerName   — owner full name
- *   email       — owner email (unique within company)
- *   password    — min 8 chars
- *
- * Optional:
- *   gstin        — GST number (validated format if provided)
- *   pan          — PAN number
- *   businessType — sole_proprietor | partnership | pvt_ltd | llp | other
- *   companyPhone — business phone
- */
 const registerSchema = Joi.object({
   companyName: Joi.string()
     .trim()
@@ -36,7 +21,7 @@ const registerSchema = Joi.object({
     .max(255)
     .required()
     .messages({
-      'string.min':  'Company name must be at least 2 characters',
+      'string.min':   'Company name must be at least 2 characters',
       'any.required': 'Company name is required',
     }),
 
@@ -107,14 +92,6 @@ const registerSchema = Joi.object({
     }),
 });
 
-/**
- * Login schema.
- *
- * Required:
- *   email     — user email
- *   password  — user password
- *   companyId — tenant UUID (required — multi-tenant safety)
- */
 const loginSchema = Joi.object({
   email: Joi.string()
     .trim()
@@ -143,12 +120,6 @@ const loginSchema = Joi.object({
     }),
 });
 
-/**
- * Refresh token schema.
- *
- * Required:
- *   refreshToken — JWT refresh token string
- */
 const refreshSchema = Joi.object({
   refreshToken: Joi.string()
     .min(10)
@@ -158,8 +129,4 @@ const refreshSchema = Joi.object({
     }),
 });
 
-module.exports = {
-  registerSchema,
-  loginSchema,
-  refreshSchema,
-};
+module.exports = { registerSchema, loginSchema, refreshSchema };

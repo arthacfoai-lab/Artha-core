@@ -5,6 +5,7 @@ const { withTransaction }      = require('@artha/database');
 const companyRepository        = require('@artha/database').companyRepository;
 const userRepository           = require('@artha/database').userRepository;
 const auditRepository          = require('@artha/database').auditRepository;
+const { seedDefaultAccounts }  = require('../accounting/ledger.engine');
 const { hashPassword, verifyPassword } = require('./password.service');
 const { issueTokenPair, refreshAccessToken } = require('./token.service');
 const {
@@ -14,40 +15,32 @@ const {
 } = require('@artha/errors');
 
 /**
- * ARTHA Auth Engine
+ * ARTHA Auth Engine — UPDATED Day 3
  *
- * Handles all authentication and identity operations.
- * Pure business logic — no Express dependency.
- * Receives typed inputs, returns typed outputs.
- * Can be called from HTTP handlers OR queue workers.
+ * Change from Day 2:
+ *   register() now seeds the default chart of accounts inside the
+ *   same transaction as company + user creation.
+ *   This ensures every new company has a complete ledger set
+ *   before any accounting operation can be attempted.
  *
- * Operations:
- *   register()  — create company + owner user atomically
- *   login()     — verify credentials, issue token pair
- *   refresh()   — issue new access token from refresh token
- *   getMe()     — load current user + company profile
+ * All other methods unchanged from Day 2.
  *
- * Multi-tenant rules:
- *   - Company created first, user scoped under company_id
- *   - login() requires companyId — prevents cross-tenant email collisions
- *   - All DB writes inside withTransaction() — atomic or rollback
- *   - Audit log written for every auth event (silent — never crashes tx)
+ * Integration points added (Day 3):
+ *   - ledger.engine.seedDefaultAccounts() — called in register() transaction
  *
- * Integration points (Day 1):
+ * Integration points (existing Day 1/2):
  *   - companyRepository — create, findById
  *   - userRepository    — create, findByEmail, touchLastSeen
  *   - auditRepository   — writeSilent for all auth events
- *   - withTransaction   — atomic company + user creation
- *
- * Integration points (Day 3+):
- *   - ledger.engine.js  — seed chart of accounts on company registration
- *   - session package   — bind WhatsApp session after login (Day 5)
+ *   - withTransaction   — atomic company + user + ledger creation
+ *   - password.service  — hashPassword, verifyPassword
+ *   - token.service     — issueTokenPair, refreshAccessToken
  */
 
 /**
- * Register a new company and owner user.
- * Atomic — both created in single transaction or neither.
- * Returns token pair immediately — user is logged in on registration.
+ * Register a new company, owner user, and seed chart of accounts.
+ * All three created atomically in a single transaction.
+ * Returns token pair immediately — user is authenticated on registration.
  *
  * @param {object} params
  * @param {string} params.companyName
@@ -82,10 +75,11 @@ async function register(params, traceId) {
     );
   }
 
-  // Hash before transaction — scrypt is CPU-intensive
+  // Hash before transaction — scrypt is CPU-intensive, keep tx short
   const passwordHash = await hashPassword(password);
 
   const result = await withTransaction(async (client) => {
+
     // 1. Create company (tenant root)
     const company = await companyRepository.create(
       {
@@ -98,7 +92,7 @@ async function register(params, traceId) {
       client
     );
 
-    // 2. Create owner user scoped to new company
+    // 2. Create owner user scoped to company
     const user = await userRepository.create(
       {
         companyId:    company.id,
@@ -111,7 +105,13 @@ async function register(params, traceId) {
       client
     );
 
-    // 3. Audit — silent, never fails transaction
+    // 3. Seed default chart of accounts — Day 3 addition
+    //    Every new company gets a complete set of ledgers immediately.
+    //    This must be in the same transaction — if ledger seeding fails,
+    //    company + user creation is also rolled back.
+    const ledgers = await seedDefaultAccounts(company.id, client);
+
+    // 4. Audit — silent, never fails transaction
     await auditRepository.writeSilent(
       {
         companyId:    company.id,
@@ -120,12 +120,17 @@ async function register(params, traceId) {
         action:       'company.registered',
         resourceType: 'company',
         resourceId:   company.id,
-        payload:      { companyName, email, ownerName },
+        payload:      {
+          companyName,
+          email,
+          ownerName,
+          ledgersSeeded: ledgers.length,
+        },
       },
       client
     );
 
-    return { company, user };
+    return { company, user, ledgersSeeded: ledgers.length };
   });
 
   // Issue token pair after successful transaction
@@ -136,8 +141,9 @@ async function register(params, traceId) {
   });
 
   log.info('auth_register_complete', {
-    company_id: result.company.id,
-    user_id:    result.user.id,
+    company_id:     result.company.id,
+    user_id:        result.user.id,
+    ledgers_seeded: result.ledgersSeeded,
   });
 
   return {
@@ -149,9 +155,7 @@ async function register(params, traceId) {
 
 /**
  * Login with email + password within a company tenant.
- *
- * companyId is required — two companies can have users with the same email.
- * Never reveal whether email exists — always return generic error on failure.
+ * companyId required — multi-tenant email scoping.
  *
  * @param {string} email
  * @param {string} password
@@ -168,24 +172,22 @@ async function login(email, password, companyId, traceId, ipAddress = null) {
     throw new ValidationError('email, password, companyId are required');
   }
 
-  // Load user WITH password_hash — only findByEmail returns hash
   const userWithHash = await userRepository.findByEmail(companyId, email);
 
-  // Generic error — never reveal whether email exists
   if (!userWithHash) {
     log.warn('auth_login_email_not_found', { email });
     await auditRepository.writeSilent({
       companyId,
       traceId,
-      action:    'auth.login_failed',
-      payload:   { email, reason: 'email_not_found' },
+      action:   'auth.login_failed',
+      payload:  { email, reason: 'email_not_found' },
       ipAddress,
     });
     throw new AuthenticationError('Invalid email or password');
   }
 
   if (!userWithHash.is_active) {
-    log.warn('auth_login_inactive_user', { email, user_id: userWithHash.id });
+    log.warn('auth_login_inactive_user', { email });
     throw new AuthenticationError('Account is inactive. Contact support.');
   }
 
@@ -195,32 +197,29 @@ async function login(email, password, companyId, traceId, ipAddress = null) {
     log.warn('auth_login_invalid_password', { email, user_id: userWithHash.id });
     await auditRepository.writeSilent({
       companyId,
-      userId:    userWithHash.id,
+      userId:   userWithHash.id,
       traceId,
-      action:    'auth.login_failed',
-      payload:   { email, reason: 'invalid_password' },
+      action:   'auth.login_failed',
+      payload:  { email, reason: 'invalid_password' },
       ipAddress,
     });
     throw new AuthenticationError('Invalid email or password');
   }
 
-  // Issue tokens
   const tokens = issueTokenPair({
     id:        userWithHash.id,
     companyId,
     role:      userWithHash.role,
   });
 
-  // Touch last_seen_at — fire and forget, never awaited
   userRepository.touchLastSeen(userWithHash.id).catch(() => {});
 
-  // Success audit
   await auditRepository.writeSilent({
     companyId,
-    userId:    userWithHash.id,
+    userId:   userWithHash.id,
     traceId,
-    action:    'auth.login_success',
-    payload:   { email },
+    action:   'auth.login_success',
+    payload:  { email },
     ipAddress,
   });
 
@@ -233,9 +232,9 @@ async function login(email, password, companyId, traceId, ipAddress = null) {
 }
 
 /**
- * Issue a new access token from a valid refresh token.
+ * Issue new access token from valid refresh token.
  *
- * @param {string} token   — refresh token from client
+ * @param {string} token
  * @param {string} traceId
  * @returns {{ accessToken, expiresIn, tokenType }}
  */
@@ -258,9 +257,7 @@ function refresh(token, traceId) {
 }
 
 /**
- * Get current authenticated user profile + company.
- * Called by GET /api/v1/auth/me.
- * companyId and userId come from JWT payload via req.tenantContext.
+ * Get current authenticated user + company profile.
  *
  * @param {string} companyId
  * @param {string} userId
@@ -285,23 +282,10 @@ async function getMe(companyId, userId, traceId) {
   };
 }
 
-/**
- * Strip password_hash from user object before returning to any caller.
- * Defense-in-depth — repositories already exclude hash from safe methods,
- * but findByEmail returns the hash. Always strip before leaving engine.
- *
- * @param {object} user
- * @returns {object} user without password_hash
- */
 function _stripHash(user) {
   if (!user) { return user; }
   const { password_hash, ...safe } = user;
   return safe;
 }
 
-module.exports = {
-  register,
-  login,
-  refresh,
-  getMe,
-};
+module.exports = { register, login, refresh, getMe };
