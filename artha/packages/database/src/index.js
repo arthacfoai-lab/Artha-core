@@ -3,57 +3,99 @@
 /**
  * ARTHA Database Package — Public API
  *
- * All database access in the application imports from '@artha/database'.
- * Never import from internal paths like '@artha/database/src/client'.
+ * Centralized export surface for all database primitives,
+ * repositories, and transaction helpers.
  *
- * Exports:
- *   Client primitives:
- *     query()           — parameterized SQL query
- *     withTransaction() — atomic transaction wrapper
- *     healthCheck()     — DB connectivity probe
- *     closePool()       — graceful shutdown
- *     getPool()         — raw pool (advanced use only)
+ * RULES:
+ *   - NEVER import internal files directly outside this package
+ *   - ALWAYS use:
+ *       const db = require('@artha/database');
  *
- *   Repository base:
- *     BaseRepository    — extend to create domain repositories
+ * PURPOSE:
+ *   - Stable dependency boundary
+ *   - Prevent circular imports
+ *   - Simplify repository discovery
+ *   - Standardize transaction handling
+ *   - Enable future ORM/query-layer replacement
  *
- *   Repository singletons (added progressively per day):
- *     companyRepository  — Day 1
- *     userRepository     — Day 1
- *     ledgerRepository   — Day 3
- *     journalRepository  — Day 3
- *     auditRepository    — Day 1
+ * EXPORTED:
  *
- * Repositories not yet implemented return undefined.
- * They are wired in as their implementation days arrive.
+ *   Core DB:
+ *     getPool()
+ *     query()
+ *     withTransaction()
+ *     healthCheck()
+ *     closePool()
+ *
+ *   Base Infrastructure:
+ *     BaseRepository
+ *
+ *   Repository Singletons:
+ *     companyRepository
+ *     userRepository
+ *     auditRepository
+ *     ledgerRepository
+ *     journalRepository
+ *
+ * IMPORTANT:
+ *   Repositories MUST export instantiated singletons:
+ *
+ *     module.exports = new LedgerRepository();
+ *
+ *   NOT:
+ *
+ *     module.exports = LedgerRepository;
  */
 
 const client = require('./client');
-const { BaseRepository } = require('./repositories/base.repository');
 
-// ── Repositories — wired progressively ───────────────────────────────────────
-// Day 1 repositories
-const companyRepository = require('./repositories/company.repository');
-const userRepository    = require('./repositories/user.repository');
-const auditRepository   = require('./repositories/audit.repository');
+const {
+  BaseRepository,
+} = require('./repositories/base.repository');
 
-// Day 3 repositories (uncomment when Day 3 files are created)
-// const ledgerRepository  = require('./repositories/ledger.repository');
-// const journalRepository = require('./repositories/journal.repository');
+// ─────────────────────────────────────────────────────────────────────────────
+// Repository Singletons
+// ─────────────────────────────────────────────────────────────────────────────
 
-module.exports = {
-  // Client primitives
-  ...client,
+const companyRepository =
+  require('./repositories/company.repository');
 
-  // Base class for extension
+const userRepository =
+  require('./repositories/user.repository');
+
+const auditRepository =
+  require('./repositories/audit.repository');
+
+// Day 3 — Accounting repositories
+const ledgerRepository =
+  require('./repositories/ledger.repository');
+
+const journalRepository =
+  require('./repositories/journal.repository');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public API
+// ─────────────────────────────────────────────────────────────────────────────
+
+module.exports = Object.freeze({
+
+  // ── Core DB primitives ────────────────────────────────────────────────────
+  getPool:        client.getPool,
+  query:          client.query,
+  withTransaction: client.withTransaction,
+  healthCheck:    client.healthCheck,
+  closePool:      client.closePool,
+
+  // ── Base repository ───────────────────────────────────────────────────────
   BaseRepository,
 
-  // Repository singletons
+  // ── Domain repositories ───────────────────────────────────────────────────
   companyRepository,
   userRepository,
   auditRepository,
 
-  // Day 3+
-  // ledgerRepository,
-  // journalRepository,
-};
+  // Accounting
+  ledgerRepository,
+  journalRepository,
+
+});
